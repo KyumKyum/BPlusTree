@@ -10,6 +10,7 @@ class BPlusTree{
     BPTNode bptCreate(int size){
         BPTNode root = new BPTNode();// Initially the root node is a leaf.
         root.determineLeaf(true);
+        root.setNodeInfo(size);
         setRoot(root);
         return root;
     }
@@ -17,12 +18,11 @@ class BPlusTree{
     BPTNode bptInsert(BPTNode root, Integer key, BPTNode leftChild, BPTNode rightChild, int size){ //Insert Index
         System.out.println("Key " + key + "become index!");
         boolean isBiggest = true;
-        Map<Integer, BPTNode> temp_p = new TreeMap<>();
-//        boolean changeRight = false;
-        //Set new map, copy to the new map.
+
         if(!root.isLeaf){//Current node is index node
             Set<Integer> keySet = root.p.keySet();
             for(Integer i : keySet){
+                System.out.println(i);
                 if(key < i) {
                     System.out.println("CASE 2");
                     //Case 2: The target key will be inserted to the middle of the node
@@ -52,16 +52,23 @@ class BPlusTree{
     BPTNode bptInsert(BPTNode root, Integer key, Integer value, int size){ //Insert Leaf
         if(root.isLeaf){//Current node is leaf node
             //System.out.println("SET: [ " + key +" , " + value + " ]");
+
+            Set<Integer> keySet = root.v.keySet();
+            if(keySet!=null){
+                for(Integer i : keySet) {
+                    if(i > key) break;
+                    else System.out.println("Leaf Traverse: " + i);
+                }
+            }
+
             root.v.put(key,value);
             root.setLeafElementNum();
             System.out.println("Leaf Element : " + root.checkElementNum());
 
-            if(root.m >= size){
-                System.out.println("Leaf Overflow!");
+            if(root.checkElementNum() > root.getMaxKeys()){
+                System.out.println("Leaf Overflow! " + root.checkElementNum());
                 root = bptLeafSplit(root,size);
-                System.out.println(root.m);
 
-                for(Integer i : root.p.keySet()) System.out.println("From Insert - Key: " + i);
 //                if(getRoot() != null){
 //                    System.out.println("NO ERROR on getRoot");
 //                    root = getRoot();
@@ -69,18 +76,19 @@ class BPlusTree{
 //                    return root;
             }
         } else { //Current node isn't leaf node
-            System.out.println("ELSE CALLED");
             boolean isRecursiveCall = false;
             Set<Integer> keySet = root.p.keySet();
             for(Integer i : keySet){
                 System.out.println("Traverse: " + i);
                 if(key < i){
                     bptInsert(root.p.get(i),key,value,size);
+                    System.out.println("Goes to current child!");
                     isRecursiveCall = true;
                     break;
                 }
             }
             if(root.hasRightChild() && !isRecursiveCall){
+                System.out.println("Goes to Rightmost Child!");
                 bptInsert(root.r,key,value,size);
             }
         }
@@ -102,11 +110,14 @@ class BPlusTree{
         } else {
             System.out.println("Parent Created!");
             parentIndex = new BPTNode();
+            parentIndex.setNodeInfo(size);
             parentIndex.determineLeaf(false);
             parentIndex.setParent(null);
 
             setRoot(parentIndex);
         }
+        rightChild.setNodeInfo(size);
+        leftChild.setNodeInfo(size);
         rightChild.setParent(parentIndex);
         leftChild.setParent(parentIndex);
         leftChild.determineLeaf(false);
@@ -118,26 +129,30 @@ class BPlusTree{
         for(Integer i : keySet){
             if(++idx < mid){
                 System.out.println("Index " + idx + " - Key " + i + "goes leftTree");
-                leftChild = leftChild.bptInsert(leftChild,i,index.p.get(i),null,size);
+                BPTNode element = index.p.get(i);
+                leftChild = leftChild.bptInsert(leftChild,i,element,null,size);
+                element.setParent(leftChild);
             }else if(idx == mid){
                 System.out.println("Index " + idx  + " - Key " + i + " Became mid node");
                 parentIndex = parentIndex.bptInsert(parentIndex,i,leftChild,rightChild,size); //Middle node will promoted to index node
-                leftChild.setRightChild(index.p.get(i)); // Current Index child became left's right child
+                BPTNode element = index.p.get(i);
+                leftChild.setRightChild(element); // Current Index child became left's right child
+                element.setParent(leftChild);
             } else {
-                   System.out.println("Index " + idx + " - Key " + i + "goes rightTree");
-                   rightChild = rightChild.bptInsert(rightChild,i,index.p.get(i),null,size);
+                System.out.println("Index " + idx + " - Key " + i + "goes rightTree");
+                BPTNode element = index.p.get(i);
+                rightChild = rightChild.bptInsert(rightChild,i,element,null,size);
+                element.setParent(rightChild);
             }
         }
-        rightChild.setRightChild(index.getRightChild());
-
-        System.out.println("Nodes Connected");
+        BPTNode element = index.getRightChild();
+        rightChild.setRightChild(element);
+        element.setParent(rightChild);
 
         if(parentIndex.checkElementNum() >= size) {
-            System.out.println("Returning Parent Node");
             returnIndex = bptIndexSplit(parentIndex,size);
         }
         else{
-            System.out.println("Returning newly Created Parent Node");
             returnIndex = parentIndex;
         }
 
@@ -160,6 +175,7 @@ class BPlusTree{
         } else {
             System.out.println("Null Parent!");
             indexNode = new BPTNode();
+            indexNode.setNodeInfo(size);
             indexNode.determineLeaf(false);
             indexNode.setParent(null);
 
@@ -173,6 +189,8 @@ class BPlusTree{
             System.out.println("This Leaf Have Right child!");
             rightLeaf.setRightChild(leaf.getRightChild());
         }
+        rightLeaf.setNodeInfo(size);
+        tempLeaf.setNodeInfo(size);
         rightLeaf.setParent(indexNode);//Set this node as parent
         tempLeaf.determineLeaf(true);
         rightLeaf.determineLeaf(true);
@@ -204,8 +222,6 @@ class BPlusTree{
         tempLeaf = null;
         //Connecting generated nodes
         leaf.setRightChild(rightLeaf);
-        System.out.println("Nodes Connected");
-        System.out.println("Current Parent node: " + indexNode.checkElementNum());
 
         //Check whether the index overflows.
         if(indexNode.checkElementNum() >= size){
@@ -257,7 +273,7 @@ class BPlusTree{
         return true;
     }
 
-    BPTNode bptRangeSearch(BPTNode root, int start, int end){
+    void bptRangeSearch(BPTNode root, int start, int end){
 
         System.out.println("***Performing Range Search...***");
 
@@ -278,7 +294,145 @@ class BPlusTree{
             firstLeaf = firstLeaf.r;
         }
 
-        return null;
+    }
+
+    ArrayList<Integer> traverseIndex(BPTNode root, ArrayList<Integer> indexSet) {
+        Queue<BPTNode> childQueue = new LinkedList<>(); //This saves the list of the child
+        boolean isLastElement = false;
+
+        do {
+            if (!root.isLeaf) {
+                Set<Integer> keySet = root.p.keySet();
+                for (Integer i : keySet) {
+                    System.out.println(i);
+                    indexSet.add(i);
+                    if (!root.p.get(i).isLeaf) {
+                        childQueue.offer(root.p.get(i));
+                    }
+                }
+                indexSet.add(null); //Classifies nodes.
+                if(!root.getRightChild().isLeaf){
+                    System.out.println("RIGHT!");
+                    childQueue.offer(root.getRightChild());
+                }
+
+                isLastElement = childQueue.isEmpty();
+
+                root = childQueue.poll();
+            }
+        }while (!isLastElement) ;
+
+        return indexSet;
+    }
+
+    void createIndexFile(BPTNode root){
+
+        ArrayList<Integer> indexSet = new ArrayList<>();
+        int curElementNum = 0;
+
+        try{
+            FileWriter writer = new FileWriter("index.dat");
+            writer.append("D: ").append(String.valueOf(root.getDegree())).append('\n');
+
+            indexSet = traverseIndex(root,indexSet);
+
+            //System.out.println(indexSet);
+
+            for(Integer i : indexSet){
+                 // Records current element number in nodes.
+                if(i == null){//End of current node
+                    writer.append('-');
+                    writer.append(String.valueOf(curElementNum));
+                    writer.append('\n');
+                    curElementNum = 0;
+                }
+                else {
+                    writer.append(i.toString());
+                    ++curElementNum;
+                    writer.append(",");
+                }
+
+            }
+
+            System.out.println("Printed!");
+            writer.flush();
+            writer.close();
+        }catch (IOException e){
+            System.out.println(e);
+        }
+    }
+
+//    boolean bptDelete(BPTNode root, Integer key){
+//        boolean recursiveCall = false;
+//
+//        if(root != null) {
+//            if(root.isLeaf){ // Case 1: Deleting Node is leaf node
+//                Set<Integer> keySet = root.v.keySet();
+//                for(Integer i : keySet){
+//                    System.out.println("[Leaf] Searching for key " + key + "... Current key: " + i);
+//                    if(i == key){
+//                        System.out.println("Delete Key : " + i);
+//                        root.v.remove(i);
+//
+//                        //Check Case 1-1: The node still have enough element
+//                        if(root.checkElementNum() < root.getMinKeys()){ //If Case 1-1 doesn't satisfied
+//                            //The node is deficient.
+//                            //Check Case 1-2: Are siblings have enough
+//                        }
+//
+//                        return true; // Matching key found
+//                    }
+//                }
+//                System.out.println("Key " + key + " not found");
+//                return true;
+//            } else { //Current node is index node;
+//                Set<Integer> keySet = root.p.keySet();
+//                for(Integer i: keySet){
+//                    if(!recursiveCall){
+//                        System.out.println("[Index] Searching for key " + key +"... Current key: " + i);
+//                        if(key < i){
+//                            System.out.println("Goes to Left Child!");
+//                            recursiveCall = bptDelete(root.p.get(i),key);//Search its child if i < key
+//                        }
+//                    }
+//                }
+//                if(root.hasRightChild() && ! recursiveCall){
+//                    System.out.println("Goes to Right Child!");
+//                    bptDelete(root.r,key);//If the node has right child
+//                }
+//            }
+//        }
+//        return true;
+//    }
+
+    void printOutput(BPTNode root){
+        BPTNode firstLeaf = root;
+
+        while(!firstLeaf.isLeaf){
+            Set<Integer> keySet = firstLeaf.p.keySet();
+            firstLeaf = firstLeaf.p.get(keySet.iterator().next());
+        }
+
+        try{
+            FileWriter writer = new FileWriter("output.csv");
+
+            while(firstLeaf != null){ //Print all leaf nodes
+                for(Integer i : firstLeaf.v.keySet()){
+                    writer.append(i.toString());
+                    writer.append(",");
+                    writer.append(firstLeaf.v.get(i).toString());
+                    writer.append('\n');
+
+                    System.out.println("Print Value");
+                }
+                firstLeaf = firstLeaf.r;
+            }
+            System.out.println("Printed!");
+            writer.flush();
+            writer.close();
+        }catch (IOException e){
+            System.out.println(e);
+        }
     }
 
     void setRoot(BPTNode root){this.ROOT_NODE = root;}
@@ -287,6 +441,11 @@ class BPlusTree{
 }
 
 class BPTNode extends BPlusTree{
+    private int maxChildren;
+    private int minChildren;
+    private int maxKeys;
+    private int minKeys;
+    private int degree;
     int m; //Number of Keys
     BPTNode r; // pointer to the rightmost child node
     BPTNode parent; // pointer to its parent
@@ -302,6 +461,18 @@ class BPTNode extends BPlusTree{
         p = new TreeMap<>();
         v = new TreeMap<>();
     }
+
+    void setNodeInfo(int order){
+        this.maxKeys = order - 1;
+        this.minKeys = (int)Math.ceil((double)order/2) -1;
+        this.maxChildren = order;
+        this.degree = order;
+        this.minChildren = (int)Math.ceil((double)order/2);
+    }
+
+    int getMaxKeys(){return this.maxKeys;}
+    int getMinKeys(){return this.minKeys;}
+    int getDegree(){return this.degree;}
 
     void setLeafElementNum() {this.m = this.v.size();}
     void setIndexElementNum() {this.m = this.p.size();}
@@ -346,7 +517,7 @@ public class BPTree {
     public static void main(String[] args) {
 
         BPlusTree bPlusTree = new BPlusTree();
-        BPTNode root = bPlusTree.bptCreate(3);
+        BPTNode root = bPlusTree.bptCreate(4);
 
         try{
             File file = new File("input.csv");
@@ -361,7 +532,7 @@ public class BPTree {
                 Integer curValue = Integer.parseInt(curData[1]);
 
                 System.out.println("INPUT : [ " + curKey + " , " + curValue + " ]");
-                root = bPlusTree.bptInsert(root,curKey,curValue,3);
+                root = bPlusTree.bptInsert(root,curKey,curValue,4);
                 System.out.println("Inserted!");
 
             }
@@ -372,29 +543,12 @@ public class BPTree {
             System.out.println(e);
         }
 
-        for(Integer i : root.p.keySet())
-            System.out.println("Key in Main :" + i);
+        bPlusTree.createIndexFile(root);
 
-        System.out.println("***Test 1: Searching key 26***");
-        bPlusTree.bptSingleSearch(root,26);
-        System.out.println("***Test 2: Searching key 10***");
-        bPlusTree.bptSingleSearch(root,10);
-        System.out.println("***Test 3: Searching key 87***");
-        bPlusTree.bptSingleSearch(root,87);
-        System.out.println("***Test 4: Searching key 86***");
-        bPlusTree.bptSingleSearch(root,86);
-        System.out.println("***Test 5: Searching key 20***");
-        bPlusTree.bptSingleSearch(root,20);
-        System.out.println("***Test 6: Searching key 9***");
-        bPlusTree.bptSingleSearch(root,9);
-        System.out.println("***Test 7: Searching key 68***");
-        bPlusTree.bptSingleSearch(root,68);
-        System.out.println("***Test 8: Searching key 84***");
-        bPlusTree.bptSingleSearch(root,84);
-        System.out.println("***Test 9: Searching key 37***");
-        bPlusTree.bptSingleSearch(root,37);
-
-        System.out.println("***Ranged Search 25~75***");
-        bPlusTree.bptRangeSearch(root,0,100);
+//        for(Integer i : root.p.keySet())
+//            System.out.println("Key in Main :" + i);
+//
+        //Output
+//        bPlusTree.printOutput(root);
     }
 }
