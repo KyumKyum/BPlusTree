@@ -171,6 +171,7 @@ class BPlusTree {
 
     BPTNode bptIndexSplit(BPlusTree bPlusTree, BPTNode index, int size) {
         int mid = (int) Math.ceil((double) size / 2);
+        if(size%2 == 0) mid += 1;
         int idx = 0;
         BPTNode leftChild = new BPTNode();
         BPTNode rightChild = new BPTNode();
@@ -233,6 +234,7 @@ class BPlusTree {
 
     BPTNode bptLeafSplit(BPlusTree bPlusTree, BPTNode leaf, int size) {
         int mid = (int) Math.ceil((double) size / 2);
+        if(size%2 == 0) mid += 1; //If the degree is even number, plus 1 to the pivot
         int idx = 0;
         int midIdx = 0;
         BPTNode tempLeaf = new BPTNode();
@@ -699,8 +701,6 @@ class BPlusTree {
         if (target.checkElementNum() < target.getMinKeys()) { // Case 2: Is Deficient
             System.out.println("DEFICIENT");
             Integer targetKey = null;
-            Integer substituteKey = null;
-            BPTNode substituteNode = null;
             boolean neededToChangeIndex = false;
             //Case 2-1 : Rotation - Borrow & Fill
             if (!target.v.isEmpty()) {
@@ -739,6 +739,9 @@ class BPlusTree {
                             while (!leftSibling.isLeaf) {
                                 leftSibling = leftSibling.getRightChild();
                             }
+
+                            if(leftSibling.checkElementNum() <= leftSibling.getMinKeys()) leftSibling = null;
+
                             break;
                         }
                     }
@@ -764,7 +767,77 @@ class BPlusTree {
                     replaceIndexWithBorrowedKey(target,duplicatedIndex,targetKey);
                 }
             } else {
-                System.out.println("MERGE REQUIRED");
+                System.out.println("CASE 3: Check if it can borrow from Left Index");
+                BPTNode indexParent = (target.getParent()).getParent();
+
+                if(!Objects.isNull(indexParent)){
+                    Integer leftIdx = null;
+                    Set<Integer> keySet = indexParent.p.keySet();
+                    for(Integer i : keySet){
+                        leftIdx = i;
+                        System.out.println("Cur i : " + i);
+                        if(!keySet.iterator().hasNext() || keySet.iterator().next() > targetKey)
+                            break;
+                    }
+
+                    if(!Objects.isNull(leftIdx)){
+                        BPTNode leftIndex = indexParent.p.get(leftIdx);
+                        if(leftIndex.checkElementNum() > leftIndex.getMinKeys()){ //Current Index contains enough index to lend/
+                            System.out.println("CASE 3-1: Able to borrow from left index");
+                            //Move its child to right child
+                            curParent = target.getParent();
+                            System.out.println("Current Target Key = " + targetKey);
+                            BPTNode newRightChild = curParent.p.get(targetKey);
+                            Integer newIndexKey = null;
+                            if(newRightChild.isLeaf)
+                                newIndexKey = newRightChild.v.keySet().iterator().next();
+                            else
+                                newIndexKey = newRightChild.p.keySet().iterator().next();
+                            curParent.setRightChild(newRightChild);
+                            curParent.p.remove(targetKey);
+                            //Check for duplicated index
+                            //Removed
+                            Integer lastIndex = null;
+                            Set<Integer> leftKeySet = leftIndex.p.keySet();
+                            for(Integer i : leftKeySet) lastIndex = i;
+                            BPTNode container = leftIndex.p.get(lastIndex);
+                            //Put appropriate values to current parent: borrowing
+                            curParent.p.put(newIndexKey, leftIndex.getRightChild());
+                            leftIndex.p.remove(lastIndex);
+                            leftIndex.setIndexElementNum();
+                            //Replace borrowed key's value as right child
+                            leftIndex.setRightChild(container);
+                            //Check for duplicates
+                            BPTNode duplicated = null;
+                            if(!Objects.isNull(duplicated = findDuplicates(curParent,newIndexKey))){
+                                System.out.println("There is duplicated index");
+                                BPTNode replaceTarget = null;
+                                Set<Integer> duplicatedKeySet = duplicated.p.keySet();
+                                for(Integer i : duplicatedKeySet){
+                                    if(i.equals(newIndexKey)){
+                                        if(duplicatedKeySet.iterator().hasNext())
+                                            replaceTarget = duplicated.p.get(newIndexKey);
+                                        else
+                                            replaceTarget = duplicated.getRightChild();
+                                    }
+                                }
+
+                                if(!Objects.isNull(replaceTarget)){
+
+                                    duplicated.p.remove(newIndexKey);
+                                    Integer replacementKey = curParent.p.get(newIndexKey).v.keySet().iterator().next();
+                                    System.out.println("Replacement Key: " + replacementKey);
+                                    duplicated.p.put(replacementKey, replaceTarget);
+                                }
+                            }
+                        } else {
+                            System.out.println("CASE 3-2: IMPOSSIBLE; Try to MERGE");
+                            mergeNode(target,targetKey,true);
+                        }
+                    }
+                }
+
+
             }
         }
 
@@ -772,8 +845,10 @@ class BPlusTree {
 
     void replaceIndexWithBorrowedKey(BPTNode target, BPTNode duplicatedIndex, Integer targetKey){
         System.out.println("Change Index Required");
-        Integer substituteKey = target.v.keySet().iterator().next();
-        BPTNode substituteNode = duplicatedIndex.p.get(targetKey);
+        Integer substituteKey =
+                target.v.keySet().iterator().next();
+        BPTNode substituteNode =
+                duplicatedIndex.p.get(targetKey);
         duplicatedIndex.p.remove(targetKey);
         System.out.println("Remove " + targetKey);
         duplicatedIndex.p.put(substituteKey,substituteNode);
@@ -812,6 +887,12 @@ class BPlusTree {
 
         target.v.put(borrowedKey, borrowedValue);
         target.setLeafElementNum();
+    }
+
+    void mergeNode(BPTNode target, Integer targetKey, boolean isLeftMerge){
+        if(isLeftMerge){
+
+        }
     }
 
     void createOutputCSV(BPlusTree bPlusTree) {
@@ -960,11 +1041,11 @@ public class BPTree {
     public static void main(String[] args) {
 
         BPlusTree bPlusTree = new BPlusTree();
-//        bPlusTree = bPlusTree.create_BPlus_Tree(bPlusTree,4);
+//        bPlusTree = bPlusTree.create_BPlus_Tree(bPlusTree,3);
 //        bPlusTree.insert_CSV(bPlusTree);
-        bPlusTree.search_single(bPlusTree,49);
+//        bPlusTree.search_single(bPlusTree,49);
 //        bPlusTree.search_range(bPlusTree,4,10);
-//        bPlusTree.delete_node(bPlusTree,96);
+        bPlusTree.delete_node(bPlusTree,47);
 
 //        for(Integer i : root.p.keySet())
 //            System.out.println("Key in Main :" + i);
