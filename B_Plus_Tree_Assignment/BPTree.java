@@ -79,9 +79,8 @@ class BPlusTree {
                 if (curLine.isEmpty()) break; //Ignore blank
                 Integer curKey = Integer.parseInt(curLine);
 
-                //System.out.println("DELETE: " + curKey);
                 bptDelete(bPlusTree, root, curKey);
-                createIndexFile(indexFileName,bPlusTree);
+                System.out.println("DELETE SUCCESS");
             }
 
             bufReader.close();
@@ -89,6 +88,7 @@ class BPlusTree {
         } catch (IOException e) {
             System.out.println(e);
         }
+        createIndexFile(indexFileName,bPlusTree);
         createOutputCSV(bPlusTree);
 
     }
@@ -732,15 +732,15 @@ class BPlusTree {
                     }
                 } else { //Current Node is root node, but underflow happens
                     //Perform Level down
-                    if(target.checkElementNum() < target.getMinKeys()){
-                        //System.out.println("Level Down");
+                    if(underflow(target) || target.checkElementNum() <= 0){
+                        System.out.println("Level Down");
                         bPlusTree.setRoot(bPlusTree,target.getRightChild());
                     }
                     //updateKey(bPlusTree.getRoot());
                 }
             } else {
                 //Merge Finished
-                //System.out.println("Merge End");
+                System.out.println("Merge End");
                 updateKey(target);
             }
         }
